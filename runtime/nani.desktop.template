@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Nani Translate
+Comment=Translate text with Nani
+Exec=nani %U
+Icon=nani
+Terminal=false
+Categories=Utility;
+MimeType=x-scheme-handler/naniapp;
+StartupNotify=true
+StartupWMClass=Nani

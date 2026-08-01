@@ -1,0 +1,170 @@
+name: Upstream watchdog
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: upstream-watchdog
+  cancel-in-progress: false
+
+jobs:
+  verify-upstream:
+    name: Verify upstream compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      build_status: ${{ steps.verify.outputs.build_status }}
+      drift: ${{ steps.verify.outputs.drift }}
+      new_version: ${{ steps.verify.outputs.new_version }}
+      upstream_version: ${{ steps.verify.outputs.upstream_version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install --yes p7zip-full
+
+      - name: Verify current upstream release
+        id: verify
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          bash scripts/build-app.sh >watchdog-build.log 2>&1
+          build_status=$?
+          set -e
+
+          echo "build_status=$build_status" >>"$GITHUB_OUTPUT"
+          baseline_version="$(sed -n "s/^- Nani \`\\([^\`]*\\)\`.*/\\1/p" docs/upstream-analysis.md | head -n 1)"
+          upstream_version=""
+          upstream_report=dist/reports/upstream.json
+          if [ -f "$upstream_report" ]; then
+            upstream_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).version' "$upstream_report")"
+          fi
+          echo "upstream_version=$upstream_version" >>"$GITHUB_OUTPUT"
+          if [ -n "$baseline_version" ] && [ -n "$upstream_version" ] && \
+            [ "$baseline_version" != "$upstream_version" ]; then
+            echo "new_version=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "new_version=false" >>"$GITHUB_OUTPUT"
+          fi
+
+          drift=false
+          report=dist/reports/patch-report.json
+          if [ "$build_status" -ne 0 ] && [ -f "$report" ] && node - "$report" <<'NODE'
+          const fs = require("node:fs");
+          const report = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const drift = Array.isArray(report.patches) && report.patches.some(
+            ({ status }) => status === "failed-required" || status === "failed-integrity",
+          );
+          process.exit(drift ? 0 : 1);
+          NODE
+          then
+            drift=true
+          fi
+          echo "drift=$drift" >>"$GITHUB_OUTPUT"
+
+          exit "$build_status"
+
+      - name: Fail when upstream verification failed
+        if: steps.verify.outputs.build_status != '0'
+        run: exit 1
+
+  report:
+    name: Report upstream changes
+    needs: verify-upstream
+    if: >-
+      always() &&
+      (needs.verify-upstream.outputs.new_version == 'true' ||
+      needs.verify-upstream.outputs.drift == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write # Required only for creating or updating watchdog issues.
+    steps:
+      - name: Report a new upstream version
+        if: needs.verify-upstream.outputs.new_version == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          BUILD_STATUS: ${{ needs.verify-upstream.outputs.build_status }}
+          UPSTREAM_VERSION: ${{ needs.verify-upstream.outputs.upstream_version }}
+        with:
+          script: |
+            const title = `[watchdog] Nani ${process.env.UPSTREAM_VERSION} is available`;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "all",
+              per_page: 100,
+            });
+            const alreadyReported = issues.some(
+              (issue) => !issue.pull_request && issue.title === title,
+            );
+            if (!alreadyReported) {
+              const result = process.env.BUILD_STATUS === "0" ? "passed" : "failed";
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body: [
+                  `Nani ${process.env.UPSTREAM_VERSION} differs from the documented baseline.`,
+                  `The Linux compatibility build **${result}**.`,
+                  "",
+                  `Workflow run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                ].join("\n"),
+              });
+            }
+
+      - name: Create or update drift issue
+        if: needs.verify-upstream.outputs.drift == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const title = "[watchdog] Upstream patch drift detected";
+            const body = [
+              "The upstream compatibility build detected required patch drift.",
+              "",
+              `Workflow run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join("\n");
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              per_page: 100,
+            });
+            const existing = openIssues.find(
+              (issue) => !issue.pull_request && issue.title === title,
+            );
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+              });
+            }

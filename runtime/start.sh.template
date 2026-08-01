@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+launcher_path="$(readlink -f -- "$0")"
+launcher_dir="$(cd "$(dirname "$launcher_path")" && pwd)"
+app_dir="${NANI_APP_DIR:-$launcher_dir}"
+electron="$app_dir/electron"
+
+if [[ "${APPIMAGE:-}" = /* ]]; then
+  NANI_LAUNCHER_PATH="$(readlink -f -- "$APPIMAGE")"
+else
+  NANI_LAUNCHER_PATH="$launcher_path"
+fi
+export NANI_LAUNCHER_PATH
+
+if [ ! -x "$electron" ]; then
+  printf 'nani: Electron executable not found: %s\n' "$electron" >&2
+  exit 1
+fi
+
+ozone_platform="${NANI_OZONE_PLATFORM:-auto}"
+case "$ozone_platform" in
+  x11|wayland|auto) ;;
+  *)
+    printf 'nani: NANI_OZONE_PLATFORM must be x11, wayland, or auto (got %s)\n' \
+      "$ozone_platform" >&2
+    exit 2
+    ;;
+esac
+
+has_ozone_argument=false
+for argument in "$@"; do
+  case "$argument" in
+    --ozone-platform|--ozone-platform=*|--ozone-platform-hint|--ozone-platform-hint=*)
+      has_ozone_argument=true
+      break
+      ;;
+  esac
+done
+
+electron_arguments=()
+if [ "$has_ozone_argument" = false ]; then
+  if [ "$ozone_platform" = auto ]; then
+    if [ -n "${DISPLAY:-}" ]; then
+      ozone_platform=x11
+    elif [ -n "${WAYLAND_DISPLAY:-}" ]; then
+      ozone_platform=wayland
+    else
+      ozone_platform=x11
+    fi
+  fi
+  electron_arguments+=("--ozone-platform=$ozone_platform")
+fi
+
+if [ -n "${NANI_CDP_PORT:-}" ]; then
+  if [[ ! "$NANI_CDP_PORT" =~ ^[0-9]+$ ]] ||
+    (( 10#$NANI_CDP_PORT < 1 || 10#$NANI_CDP_PORT > 65535 )); then
+    printf 'nani: NANI_CDP_PORT must be an integer from 1 to 65535\n' >&2
+    exit 2
+  fi
+  electron_arguments+=(
+    "--remote-debugging-address=127.0.0.1"
+    "--remote-debugging-port=$NANI_CDP_PORT"
+  )
+fi
+
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/nani-translate-linux"
+mkdir -p "$cache_dir"
+log_file="$cache_dir/nani.log"
+printf '\n[%s] starting Nani\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$log_file"
+
+exec "$electron" "${electron_arguments[@]}" "$@" >>"$log_file" 2>&1

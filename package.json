@@ -1,0 +1,18 @@
+{
+  "name": "nani-translate-linux",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Unofficial local Linux build wrapper for Nani Translate",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check scripts/analyze-upstream.mjs && node --check scripts/patch-asar.mjs"
+  },
+  "dependencies": {
+    "@electron/asar": "4.2.1",
+    "yaml": "2.9.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

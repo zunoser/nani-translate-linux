@@ -1,0 +1,6 @@
+{
+  "name": "@napi-rs/system-ocr-linux-x64-gnu",
+  "version": "1.0.2-nani-linux-stub",
+  "private": true,
+  "main": "index.js"
+}

@@ -1,0 +1,9 @@
+node_modules/
+nani-app/
+build/
+dist/
+.cache/
+*.dmg
+*.part
+patch-report.json
+upstream-analysis.json
