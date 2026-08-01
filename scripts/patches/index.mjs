@@ -1,4 +1,6 @@
+import deeplinkReadiness from "./deeplink-readiness.mjs";
 import disableUpdater from "./disable-updater.mjs";
+import linuxCloseToTray from "./linux-close-to-tray.mjs";
 import linuxOnboarding from "./linux-onboarding.mjs";
 import linuxTray from "./linux-tray.mjs";
 import ocrStub from "./ocr-stub.mjs";
@@ -10,6 +12,8 @@ export const corePatchDescriptors = [
   ocrStub,
   linuxOnboarding,
   linuxTray,
+  linuxCloseToTray,
+  deeplinkReadiness,
   disableUpdater,
   xdgAutostart,
 ];

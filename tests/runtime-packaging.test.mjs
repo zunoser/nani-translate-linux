@@ -53,6 +53,14 @@ test("explicit ozone CLI argument wins and URL arguments pass through", () => {
   ]);
 });
 
+test("hidden autostart argument passes through to Electron", () => {
+  const setup = fixture();
+  assert.deepEqual(runLauncher(setup, ["--autostart"]), [
+    "--ozone-platform=x11",
+    "--autostart",
+  ]);
+});
+
 test("launcher limits optional CDP to localhost", () => {
   const setup = fixture();
   assert.deepEqual(runLauncher(setup, [], { NANI_CDP_PORT: "9222" }), [

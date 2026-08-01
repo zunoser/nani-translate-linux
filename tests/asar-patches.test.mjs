@@ -10,6 +10,10 @@ import {
   XSEL_RELATIVE_PATH,
 } from "../scripts/patch-asar.mjs";
 
+import deeplinkReadiness, {
+  DEEPLINK_ANCHOR,
+  DEEPLINK_MARKER,
+} from "../scripts/patches/deeplink-readiness.mjs";
 import { normalizeDescriptors, PHASE_MAIN_BUNDLE } from "../scripts/patches/descriptor.mjs";
 import disableUpdater, {
   UPDATER_ENABLE_ANCHOR,
@@ -17,6 +21,10 @@ import disableUpdater, {
   UPDATER_MARKER,
 } from "../scripts/patches/disable-updater.mjs";
 import { runPatchDescriptors } from "../scripts/patches/engine.mjs";
+import linuxCloseToTray, {
+  CLOSE_TO_TRAY_ANCHOR,
+  CLOSE_TO_TRAY_MARKER,
+} from "../scripts/patches/linux-close-to-tray.mjs";
 import linuxOnboarding, {
   ONBOARDING_ANCHOR,
   verifyLinuxOnboarding,
@@ -32,6 +40,7 @@ import xdgAutostart, {
   AUTOSTART_GET_ANCHOR,
   AUTOSTART_MARKER,
   AUTOSTART_SET_ANCHOR,
+  AUTOSTART_SYNC_ANCHOR,
 } from "../scripts/patches/xdg-autostart.mjs";
 
 function temporaryDirectory(t) {
@@ -45,6 +54,8 @@ test("descriptors have deterministic phase/order and reject duplicate ids", () =
     xdgAutostart,
     disableUpdater,
     linuxTray,
+    linuxCloseToTray,
+    deeplinkReadiness,
     ocrStub,
     pruneNonLinux,
     linuxOnboarding,
@@ -54,6 +65,8 @@ test("descriptors have deterministic phase/order and reject duplicate ids", () =
     "ocr-stub",
     "linux-onboarding",
     "linux-tray",
+    "linux-close-to-tray",
+    "deeplink-readiness",
     "disable-updater",
     "xdg-autostart",
   ]);
@@ -64,12 +77,21 @@ test("Nani 1.1.0 semantic anchors apply once and are idempotent", () => {
   let source = [
     UPDATER_ENABLE_ANCHOR,
     TRAY_ANCHOR,
+    CLOSE_TO_TRAY_ANCHOR,
+    DEEPLINK_ANCHOR,
     AUTOSTART_GET_ANCHOR,
     AUTOSTART_SET_ANCHOR,
+    AUTOSTART_SYNC_ANCHOR,
     UPDATER_HANDLERS_ANCHOR,
   ].join(";");
 
-  for (const descriptor of [linuxTray, disableUpdater, xdgAutostart]) {
+  for (const descriptor of [
+    linuxTray,
+    linuxCloseToTray,
+    deeplinkReadiness,
+    disableUpdater,
+    xdgAutostart,
+  ]) {
     const result = descriptor.apply({ source });
     assert.equal(result.status, "applied");
     source = result.source;
@@ -78,11 +100,16 @@ test("Nani 1.1.0 semantic anchors apply once and are idempotent", () => {
     assert.equal(again.source, source);
   }
   assert.match(source, new RegExp(TRAY_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(source, new RegExp(CLOSE_TO_TRAY_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(source, new RegExp(DEEPLINK_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(source, new RegExp(UPDATER_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(source, new RegExp(AUTOSTART_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(source, /process\.platform==="linux"\?async\(\)=>!1:xa/);
   assert.match(source, /nativeImage\.createFromPath/);
   assert.match(source, /NANI_LAUNCHER_PATH/);
+  assert.match(source, /await \$naniSyncAutostart\(\)/);
+  assert.match(source, /webContents\.isLoading\(\)/);
+  assert.match(source, /process\.platform==="darwin"\|\|process\.platform==="linux"/);
 });
 
 test("required anchor drift is reported and main bundle remains unchanged", () => {
