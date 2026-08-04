@@ -53,7 +53,9 @@ printf '{"status":"not-run"}\n' >"$report_dir/patch-report.json"
 
 log "resolving upstream release"
 IFS=$'\t' read -r version source_url source_sha512 dmg_path < <("$SCRIPT_DIR/fetch-upstream.sh")
-[ -n "$version" ] && [ -f "$dmg_path" ] || die "fetch-upstream returned incomplete data"
+if [ -z "$version" ] || [ ! -f "$dmg_path" ]; then
+  die "fetch-upstream returned incomplete data"
+fi
 node "$SCRIPT_DIR/lib/build-metadata.mjs" write-upstream-report \
   "$report_dir/upstream.json" "$version" "$source_url" "$source_sha512" "$dmg_path"
 
@@ -117,7 +119,9 @@ else
   IFS=$'\t' read -r sqlite_url sqlite_sha256 sqlite_filename < <(
     node "$SCRIPT_DIR/lib/build-metadata.mjs" sqlite-asset "$sqlite_release" "$sqlite_version" "$electron_abi"
   )
-  [ -n "$sqlite_url" ] && [ -n "$sqlite_sha256" ] || die "could not resolve better-sqlite3 prebuild"
+  if [ -z "$sqlite_url" ] || [ -z "$sqlite_sha256" ]; then
+    die "could not resolve better-sqlite3 prebuild"
+  fi
   sqlite_archive="$(dirname "$sqlite_release")/$sqlite_filename"
   download_file "$sqlite_url" "$sqlite_archive" "$sqlite_sha256"
 fi
