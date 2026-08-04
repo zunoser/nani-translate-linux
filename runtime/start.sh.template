@@ -40,7 +40,16 @@ for argument in "$@"; do
 done
 
 electron_arguments=()
-if [ "$has_ozone_argument" = false ] && [ "$ozone_platform" != auto ]; then
+if [ "$has_ozone_argument" = false ]; then
+  if [ "$ozone_platform" = auto ]; then
+    if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+      ozone_platform=wayland
+    elif [ -n "${DISPLAY:-}" ]; then
+      ozone_platform=x11
+    else
+      ozone_platform=x11
+    fi
+  fi
   electron_arguments+=("--ozone-platform=$ozone_platform")
 fi
 

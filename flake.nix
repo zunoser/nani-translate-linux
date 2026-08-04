@@ -113,7 +113,8 @@
 
               mkdir -p "$out/bin" "$out/share/applications" "$out/share/icons/hicolor/512x512/apps"
               makeWrapper "$out/opt/nani/start.sh" "$out/bin/nani" \
-                --set NANI_APP_DIR "$out/opt/nani"
+                --set NANI_APP_DIR "$out/opt/nani" \
+                --prefix LD_LIBRARY_PATH : "${pkgs.libglvnd}/lib"
               substitute runtime/nani.desktop.template "$out/share/applications/nani.desktop" \
                 --replace-fail "Exec=nani %U" "Exec=$out/bin/nani %U"
               install -m 0644 "$out/opt/nani/resources/icon.png" \
