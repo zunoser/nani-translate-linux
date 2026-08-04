@@ -35,8 +35,9 @@ mv -f -- "$manifest_part" "$manifest_path"
 IFS=$'\t' read -r version dmg_url expected_sha512 filename < <(
   node "$SCRIPT_DIR/lib/resolve-upstream.mjs" "$manifest_path" "$NANI_MANIFEST_URL"
 )
-[ -n "$version" ] && [ -n "$dmg_url" ] && [ -n "$expected_sha512" ] && [ -n "$filename" ] || \
+if [ -z "$version" ] || [ -z "$dmg_url" ] || [ -z "$expected_sha512" ] || [ -z "$filename" ]; then
   die "upstream manifest resolver returned incomplete data"
+fi
 
 cache_key="$(printf '%s' "${expected_sha512:0:16}" | tr '/+' '_-')"
 dmg_path="$NANI_CACHE_DIR/dmg/${version}-${cache_key}-$filename"
