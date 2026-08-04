@@ -37,13 +37,11 @@ function runLauncher(setup, args = [], environment = {}) {
   return readFileSync(setup.argumentsFile, "utf8").trim().split("\n").filter(Boolean);
 }
 
-test("launcher delegates automatic platform selection to Electron", () => {
+test("launcher selects native Wayland when both display servers are available", () => {
   const setup = fixture();
-  assert.deepEqual(runLauncher(setup, [], {
-    DISPLAY: ":0",
-    WAYLAND_DISPLAY: "wayland-0",
-    XDG_SESSION_TYPE: "wayland",
-  }), []);
+  assert.deepEqual(runLauncher(setup, [], { DISPLAY: ":0", WAYLAND_DISPLAY: "wayland-0" }), [
+    "--ozone-platform=wayland",
+  ]);
 });
 
 test("launcher can explicitly force native Wayland", () => {
@@ -60,6 +58,11 @@ test("launcher can explicitly force XWayland", () => {
   ]);
 });
 
+test("launcher selects X11 when Wayland is unavailable", () => {
+  const setup = fixture();
+  assert.deepEqual(runLauncher(setup, [], { DISPLAY: ":0" }), ["--ozone-platform=x11"]);
+});
+
 test("explicit ozone CLI argument wins and URL arguments pass through", () => {
   const setup = fixture();
   const url = "https://example.com/translate?q=hello";
@@ -71,12 +74,16 @@ test("explicit ozone CLI argument wins and URL arguments pass through", () => {
 
 test("hidden autostart argument passes through to Electron", () => {
   const setup = fixture();
-  assert.deepEqual(runLauncher(setup, ["--autostart"]), ["--autostart"]);
+  assert.deepEqual(runLauncher(setup, ["--autostart"]), [
+    "--ozone-platform=x11",
+    "--autostart",
+  ]);
 });
 
 test("launcher limits optional CDP to localhost", () => {
   const setup = fixture();
   assert.deepEqual(runLauncher(setup, [], { NANI_CDP_PORT: "9222" }), [
+    "--ozone-platform=x11",
     "--remote-debugging-address=127.0.0.1",
     "--remote-debugging-port=9222",
   ]);
