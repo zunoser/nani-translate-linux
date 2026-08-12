@@ -202,6 +202,7 @@
               gawk
               gnugrep
               gnutar
+              just
               nodejs_22
               p7zip
               patchelf

@@ -31,20 +31,17 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
+      - name: Install Nix
+        uses: cachix/install-nix-action@b4b293eae0b79aac8a161bb32925a5508c9cca93 # v31
+
+      - name: Check Just recipes and run tests
+        run: nix develop -c bash -c 'just --fmt --check && just test'
 
       - name: Check JavaScript syntax
         run: npm run check
 
       - name: Check shell scripts
         run: shellcheck -x scripts/*.sh scripts/lib/*.sh runtime/start.sh.template
-
-      - name: Check Bash syntax
-        run: bash -n scripts/*.sh scripts/lib/*.sh runtime/start.sh.template
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@b4b293eae0b79aac8a161bb32925a5508c9cca93 # v31
 
       - name: Check Nix flake
         run: nix flake check

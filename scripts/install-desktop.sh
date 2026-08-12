@@ -17,8 +17,8 @@ desktop_file="$desktop_dir/nani.desktop"
 bin_link="$bin_home/nani"
 
 [ -f "$desktop_template" ] || die "desktop template not found: $desktop_template"
-[ -x "$launcher" ] || die "launcher not found; run make bootstrap first"
-[ -f "$icon" ] || die "application icon not found; run make bootstrap first"
+[ -x "$launcher" ] || die "launcher not found; run just bootstrap first"
+[ -f "$icon" ] || die "application icon not found; run just bootstrap first"
 require_command update-desktop-database
 case "$bin_link" in
   *[[:space:]]*) die "launcher path contains whitespace: $bin_link" ;;
