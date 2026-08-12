@@ -8,6 +8,7 @@
     let
       supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+      upstreamPins = builtins.fromJSON (builtins.readFile ./nix/upstream-nani.json);
       electronRuntimeLibraries = pkgs: with pkgs; [
         alsa-lib
         atk
@@ -43,8 +44,8 @@
           electronLibraryPath = pkgs.lib.makeLibraryPath electronLibraries;
           dlopenLibraryPath = pkgs.lib.makeLibraryPath [ pkgs.libglvnd ];
           naniDmg = pkgs.fetchurl {
-            url = "https://nani-desktop.kiok.jp/artifacts/nani-1.1.0.dmg";
-            hash = "sha256-ARBkZowyJMfdjnZJ7VOQJ9eXRUY2PQOZadkqlGmV5HE=";
+            url = upstreamPins.dmg.url;
+            hash = upstreamPins.dmg.sri;
           };
           electronZip = pkgs.fetchurl {
             url = "https://github.com/electron/electron/releases/download/v42.5.2/electron-v42.5.2-linux-x64.zip";
@@ -56,7 +57,7 @@
           };
           nani = pkgs.buildNpmPackage {
             pname = "nani-translate-linux";
-            version = "1.1.0";
+            version = upstreamPins.version;
             src = self;
 
             npmDepsHash = "sha256-L5tUThJHvaiS8wa9btUhzJwuJggQ3a/q/aet5drsoW8=";
@@ -100,8 +101,8 @@
               export NANI_OUTPUT_DIR="$out/opt/nani"
               export NANI_REPORT_DIR="$TMPDIR/reports"
               export NANI_DMG_PATH="${naniDmg}"
-              export NANI_DMG_SHA512="CNfzxftBIR7d3J/iMOPChhixiY7eEMXTkpjsx9yaKuPLGqnr0m90kbU3emg+egl4amOE5s7AoNyT8XQS/v1BvA=="
-              export NANI_VERSION="1.1.0"
+              export NANI_DMG_SHA512="${upstreamPins.dmg.sha512}"
+              export NANI_VERSION="${upstreamPins.version}"
               export NANI_ELECTRON_ZIP_PATH="${electronZip}"
               export NANI_SQLITE_ARCHIVE_PATH="${sqliteArchive}"
               export NANI_AUTOPATCHELF=1
@@ -139,8 +140,8 @@
           electronLibraryPath = pkgs.lib.makeLibraryPath electronLibraries;
           dlopenLibraryPath = pkgs.lib.makeLibraryPath [ pkgs.libglvnd ];
           naniDmg = pkgs.fetchurl {
-            url = "https://nani-desktop.kiok.jp/artifacts/nani-1.1.0.dmg";
-            hash = "sha256-ARBkZowyJMfdjnZJ7VOQJ9eXRUY2PQOZadkqlGmV5HE=";
+            url = upstreamPins.dmg.url;
+            hash = upstreamPins.dmg.sri;
           };
           localBuild = pkgs.writeShellApplication {
             name = "nani-local-build";
@@ -163,8 +164,8 @@
               export NANI_AUTOPATCHELF_LIBRARY_PATH="${electronLibraryPath}"
               export NANI_AUTOPATCHELF_APPEND_RPATHS="${dlopenLibraryPath}"
               export NANI_DMG_PATH="${naniDmg}"
-              export NANI_DMG_SHA512="CNfzxftBIR7d3J/iMOPChhixiY7eEMXTkpjsx9yaKuPLGqnr0m90kbU3emg+egl4amOE5s7AoNyT8XQS/v1BvA=="
-              export NANI_VERSION=1.1.0
+              export NANI_DMG_SHA512="${upstreamPins.dmg.sha512}"
+              export NANI_VERSION="${upstreamPins.version}"
               exec bash "$PWD/scripts/build-app.sh" "$@"
             '';
           };

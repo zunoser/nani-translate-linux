@@ -1,0 +1,8 @@
+{
+  "version": "1.1.0",
+  "dmg": {
+    "url": "https://nani-desktop.kiok.jp/artifacts/nani-1.1.0.dmg",
+    "sha512": "CNfzxftBIR7d3J/iMOPChhixiY7eEMXTkpjsx9yaKuPLGqnr0m90kbU3emg+egl4amOE5s7AoNyT8XQS/v1BvA==",
+    "sri": "sha256-ARBkZowyJMfdjnZJ7VOQJ9eXRUY2PQOZadkqlGmV5HE="
+  }
+}

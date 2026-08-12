@@ -52,7 +52,7 @@ jobs:
           set -e
 
           echo "build_status=$build_status" >>"$GITHUB_OUTPUT"
-          baseline_version="$(sed -n "s/^- Nani \`\\([^\`]*\\)\`.*/\\1/p" docs/upstream-analysis.md | head -n 1)"
+          baseline_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).version' nix/upstream-nani.json)"
           upstream_version=""
           upstream_report=dist/reports/upstream.json
           if [ -f "$upstream_report" ]; then
