@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0",
+  "version": "1.1.3",
   "dmg": {
-    "url": "https://nani-desktop.kiok.jp/artifacts/nani-1.1.0.dmg",
-    "sha512": "CNfzxftBIR7d3J/iMOPChhixiY7eEMXTkpjsx9yaKuPLGqnr0m90kbU3emg+egl4amOE5s7AoNyT8XQS/v1BvA==",
-    "sri": "sha256-ARBkZowyJMfdjnZJ7VOQJ9eXRUY2PQOZadkqlGmV5HE="
+    "url": "https://nani-desktop.kiok.jp/artifacts/nani-1.1.3.dmg",
+    "sha512": "UwpHTZa7EsMeUzsrRA4x87R7YonJ/BxesJJuJ1indY/3AZyZNtz66Y+10L2mMtza/E5+muW6mTKfvn2MzEn7Wg==",
+    "sri": "sha256-bMt8PzDukJ+i55onpziX0Sb76tuRBv2Bm0b6UcR1MCo="
   }
 }

@@ -73,7 +73,7 @@ test("descriptors have deterministic phase/order and reject duplicate ids", () =
   assert.throws(() => normalizeDescriptors([linuxTray, linuxTray]), /Duplicate patch descriptor/);
 });
 
-test("Nani 1.1.0 semantic anchors apply once and are idempotent", () => {
+test("Nani 1.1.3 semantic anchors apply once and are idempotent", () => {
   let source = [
     UPDATER_ENABLE_ANCHOR,
     TRAY_ANCHOR,
@@ -104,7 +104,7 @@ test("Nani 1.1.0 semantic anchors apply once and are idempotent", () => {
   assert.match(source, new RegExp(DEEPLINK_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(source, new RegExp(UPDATER_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(source, new RegExp(AUTOSTART_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(source, /process\.platform==="linux"\?async\(\)=>!1:xa/);
+  assert.match(source, /process\.platform==="linux"\?async\(\)=>void 0:qe/);
   assert.match(source, /nativeImage\.createFromPath/);
   assert.match(source, /NANI_LAUNCHER_PATH/);
   assert.match(source, /await \$naniSyncAutostart\(\)/);

@@ -81,6 +81,10 @@ jobs:
           fi
           echo "drift=$drift" >>"$GITHUB_OUTPUT"
 
+          if [ "$build_status" -ne 0 ]; then
+            cat watchdog-build.log >&2
+          fi
+
           exit "$build_status"
 
       - name: Fail when upstream verification failed

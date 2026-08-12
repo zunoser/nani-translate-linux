@@ -2,8 +2,8 @@ import { definePatch, PHASE_MAIN_BUNDLE } from "./descriptor.mjs";
 import { markerStatus, replaceExactly } from "./lib.mjs";
 
 export const UPDATER_MARKER = "/* nani-linux:disable-updater */";
-export const UPDATER_ENABLE_ANCHOR = 'const ue=process.platform!=="win32"';
-export const UPDATER_HANDLERS_ANCHOR = ",ro=Ue,ao=Ca,so=In,oo=xa,io=";
+export const UPDATER_ENABLE_ANCHOR = 'const ge=process.platform!=="win32"';
+export const UPDATER_HANDLERS_ANCHOR = ",so=qe,oo=Ia,io=Un,co=Ea,lo=";
 
 export default definePatch({
   id: "disable-updater",
@@ -16,13 +16,13 @@ export default definePatch({
     let patched = replaceExactly(
       source,
       UPDATER_ENABLE_ANCHOR,
-      `const ue=process.platform==="darwin"${UPDATER_MARKER}`,
+      `const ge=process.platform==="darwin"${UPDATER_MARKER}`,
       "updater platform predicate",
     );
     patched = replaceExactly(
       patched,
       UPDATER_HANDLERS_ANCHOR,
-      ',ro=process.platform==="linux"?async()=>void 0:Ue,ao=Ca,so=process.platform==="linux"?()=>void 0:In,oo=process.platform==="linux"?async()=>!1:xa,io=',
+      ',so=process.platform==="linux"?async()=>void 0:qe,oo=Ia,io=Un,co=Ea,lo=',
       "updater IPC handlers",
     );
     return { source: patched, status: "applied" };
