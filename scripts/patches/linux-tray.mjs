@@ -2,8 +2,8 @@ import { definePatch, PHASE_MAIN_BUNDLE } from "./descriptor.mjs";
 import { markerStatus, replaceExactly } from "./lib.mjs";
 
 export const TRAY_MARKER = "/* nani-linux:linux-tray */";
-export const TRAY_ANCHOR = 'function Is(e){if(!lt()&&process.platform==="win32"){const t=new c.Tray(v.join(__dirname,"../../resources/tray-icon-win.ico"));Jn(t),xe(t,e);return}xe(null,e)}';
-const TRAY_REPLACEMENT = `function Is(e){${TRAY_MARKER}if(!lt()&&(process.platform==="win32"||process.platform==="linux")){const t=new c.Tray(process.platform==="linux"?c.nativeImage.createFromPath(v.join(__dirname,"../../resources/icon.png")).resize({width:24,height:24}):v.join(__dirname,"../../resources/tray-icon-win.ico"));Jn(t),xe(t,e);return}xe(null,e)}`;
+export const TRAY_ANCHOR = 'function Xs(e){if(!ft()&&process.platform==="win32"){const t=new c.Tray(k.join(__dirname,"../../resources/tray-icon-win.ico"));rr(t),Fe(t,e);return}Fe(null,e)}';
+const TRAY_REPLACEMENT = `function Xs(e){${TRAY_MARKER}if(!ft()&&(process.platform==="win32"||process.platform==="linux")){const t=new c.Tray(process.platform==="linux"?c.nativeImage.createFromPath(k.join(__dirname,"../../resources/icon.png")).resize({width:24,height:24}):k.join(__dirname,"../../resources/tray-icon-win.ico"));rr(t),Fe(t,e);return}Fe(null,e)}`;
 
 export default definePatch({
   id: "linux-tray",

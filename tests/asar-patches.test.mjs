@@ -73,7 +73,7 @@ test("descriptors have deterministic phase/order and reject duplicate ids", () =
   assert.throws(() => normalizeDescriptors([linuxTray, linuxTray]), /Duplicate patch descriptor/);
 });
 
-test("Nani 1.1.3 semantic anchors apply once and are idempotent", () => {
+test("Nani 1.1.9 semantic anchors apply once and are idempotent", () => {
   let source = [
     UPDATER_ENABLE_ANCHOR,
     TRAY_ANCHOR,
@@ -104,7 +104,7 @@ test("Nani 1.1.3 semantic anchors apply once and are idempotent", () => {
   assert.match(source, new RegExp(DEEPLINK_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(source, new RegExp(UPDATER_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(source, new RegExp(AUTOSTART_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(source, /process\.platform==="linux"\?async\(\)=>void 0:qe/);
+  assert.match(source, /process\.platform==="linux"\?async\(\)=>void 0:We/);
   assert.match(source, /nativeImage\.createFromPath/);
   assert.match(source, /NANI_LAUNCHER_PATH/);
   assert.match(source, /await \$naniSyncAutostart\(\)/);
@@ -194,7 +194,7 @@ test("non-Linux payload pruning is required and idempotent", (t) => {
 
   const first = pruneNonLinux.apply({ extractedDir: root });
   assert.equal(first.status, "applied");
-  assert.match(first.detail, /removed 7/);
+  assert.match(first.detail, /removed 9/);
   assert.doesNotThrow(() => verifyNonLinuxPayloadsAbsent(root));
   assert.equal(pruneNonLinux.apply({ extractedDir: root }).status, "already-applied");
   assert.doesNotThrow(() => verifyNonLinuxHeaderEntries(["/package.json", "/out/main/index.js"]));

@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
 require_linux_x64
-for command in curl node unzip tar; do
+for command in curl node npm unzip tar; do
   require_command "$command"
 done
 seven_zip_command >/dev/null
@@ -108,31 +108,55 @@ case "$electron_abi" in
   ''|*[!0-9]*) die "could not determine Electron Node ABI" ;;
 esac
 
-if [ -n "${NANI_SQLITE_ARCHIVE_PATH:-}" ]; then
-  [ -f "$NANI_SQLITE_ARCHIVE_PATH" ] || \
-    die "NANI_SQLITE_ARCHIVE_PATH does not exist: $NANI_SQLITE_ARCHIVE_PATH"
-  sqlite_archive="$NANI_SQLITE_ARCHIVE_PATH"
+if [ -n "${NANI_SQLITE_BINARY_PATH:-}" ]; then
+  [ -f "$NANI_SQLITE_BINARY_PATH" ] || \
+    die "NANI_SQLITE_BINARY_PATH does not exist: $NANI_SQLITE_BINARY_PATH"
+  sqlite_source="$NANI_SQLITE_BINARY_PATH"
 else
-  sqlite_release="$NANI_CACHE_DIR/better-sqlite3/v${sqlite_version}/release.json"
-  mkdir -p "$(dirname "$sqlite_release")"
-  download_file "https://api.github.com/repos/WiseLibs/better-sqlite3/releases/tags/v${sqlite_version}" "$sqlite_release"
-  IFS=$'\t' read -r sqlite_url sqlite_sha256 sqlite_filename < <(
-    node "$SCRIPT_DIR/lib/build-metadata.mjs" sqlite-asset "$sqlite_release" "$sqlite_version" "$electron_abi"
-  )
-  if [ -z "$sqlite_url" ] || [ -z "$sqlite_sha256" ]; then
-    die "could not resolve better-sqlite3 prebuild"
+  for command in python3 make c++; do
+    require_command "$command"
+  done
+  sqlite_package="$NANI_ROOT/node_modules/better-sqlite3"
+  [ -f "$sqlite_package/package.json" ] || die "run npm ci to install better-sqlite3 sources"
+  installed_sqlite_version="$(node -p "require(process.argv[1]).version" "$sqlite_package/package.json")"
+  [ "$installed_sqlite_version" = "$sqlite_version" ] || \
+    die "better-sqlite3 source version mismatch: expected $sqlite_version, got $installed_sqlite_version"
+
+  sqlite_dependencies="$work_dir/node_modules"
+  sqlite_build="$sqlite_dependencies/better-sqlite3"
+  node_addon_api="$NANI_ROOT/node_modules/node-addon-api"
+  [[ -f "$node_addon_api/package.json" ]] || die "node-addon-api package not found: $node_addon_api"
+
+  mkdir -p -- "$sqlite_dependencies"
+  cp -a -- "$sqlite_package" "$sqlite_build"
+  cp -a -- "$node_addon_api" "$sqlite_dependencies/node-addon-api"
+  npm_config_target="$electron_version"
+  npm_config_disturl="https://electronjs.org/headers"
+  if [ -n "${NANI_ELECTRON_HEADERS_PATH:-}" ]; then
+    [ -f "$NANI_ELECTRON_HEADERS_PATH" ] || \
+      die "NANI_ELECTRON_HEADERS_PATH does not exist: $NANI_ELECTRON_HEADERS_PATH"
+    headers_dir="$work_dir/electron-headers"
+    mkdir -p "$headers_dir"
+    tar -xzf "$NANI_ELECTRON_HEADERS_PATH" -C "$headers_dir"
+    npm_config_nodedir="$headers_dir/node_headers"
   fi
-  sqlite_archive="$(dirname "$sqlite_release")/$sqlite_filename"
-  download_file "$sqlite_url" "$sqlite_archive" "$sqlite_sha256"
+  log "building better-sqlite3 $sqlite_version for Electron $electron_version (ABI $electron_abi)"
+  (
+    export npm_config_target npm_config_disturl
+    [ -z "${npm_config_nodedir:-}" ] || export npm_config_nodedir
+    cd "$sqlite_build"
+    npm run build-release
+  )
+  sqlite_source="$sqlite_build/build/Release/better_sqlite3.node"
 fi
-mkdir -p "$work_dir/sqlite"
-tar -xzf "$sqlite_archive" -C "$work_dir/sqlite"
-mapfile -d '' sqlite_sources < <(find "$work_dir/sqlite" -type f -name better_sqlite3.node -print0)
-[ "${#sqlite_sources[@]}" -eq 1 ] || die "expected one better_sqlite3.node in prebuild"
+[ -f "$sqlite_source" ] || die "better-sqlite3 build did not produce better_sqlite3.node"
 native_replacements="$work_dir/native-replacements"
 sqlite_replacement="$native_replacements/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
 mkdir -p "$(dirname "$sqlite_replacement")"
-cp -a -- "${sqlite_sources[0]}" "$sqlite_replacement"
+cp -a -- "$sqlite_source" "$sqlite_replacement"
+sqlite_prebuild="$native_replacements/node_modules/better-sqlite3/prebuilds/linux-x64.node"
+mkdir -p "$(dirname "$sqlite_prebuild")"
+cp -a -- "$sqlite_source" "$sqlite_prebuild"
 
 log "patching upstream ASAR"
 node "$SCRIPT_DIR/patch-asar.mjs" \

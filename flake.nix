@@ -48,19 +48,19 @@
             hash = upstreamPins.dmg.sri;
           };
           electronZip = pkgs.fetchurl {
-            url = "https://github.com/electron/electron/releases/download/v42.5.2/electron-v42.5.2-linux-x64.zip";
-            hash = "sha256-aJ1JKIhIVzKF2P0mUnyGhqYmqIugdO+1xIhknyB1gkY=";
+            url = "https://github.com/electron/electron/releases/download/v43.5.0/electron-v43.5.0-linux-x64.zip";
+            hash = "sha256-PZP7C5UX/NdBB8Yo9hmQv/YNPCVDaUwosmse94uA3vE=";
           };
-          sqliteArchive = pkgs.fetchurl {
-            url = "https://github.com/WiseLibs/better-sqlite3/releases/download/v12.11.1/better-sqlite3-v12.11.1-electron-v146-linux-x64.tar.gz";
-            hash = "sha256-4gIa7tgN5PFSElJeMFZXVqqueQ5o4yKd9tE0X0OAMiE=";
+          electronHeaders = pkgs.fetchurl {
+            url = "https://electronjs.org/headers/v43.5.0/node-v43.5.0-headers.tar.gz";
+            hash = "sha256-S9KLjeM/ilqHyeE8bVlnlWQlF4T/iTYz0JhLADjCbIQ=";
           };
           nani = pkgs.buildNpmPackage {
             pname = "nani-translate-linux";
             version = upstreamPins.version;
             src = self;
 
-            npmDepsHash = "sha256-L5tUThJHvaiS8wa9btUhzJwuJggQ3a/q/aet5drsoW8=";
+            npmDepsHash = "sha256-kBGwHGdgxbZxUCGIqL22zXvcVsmzy3SXWGoZMliYvSA=";
             npmInstallFlags = [ "--ignore-scripts" ];
             dontNpmBuild = true;
             dontBuild = true;
@@ -78,6 +78,7 @@
               makeWrapper
               p7zip
               patchelf
+              python3
               unzip
             ];
 
@@ -104,7 +105,7 @@
               export NANI_DMG_SHA512="${upstreamPins.dmg.sha512}"
               export NANI_VERSION="${upstreamPins.version}"
               export NANI_ELECTRON_ZIP_PATH="${electronZip}"
-              export NANI_SQLITE_ARCHIVE_PATH="${sqliteArchive}"
+              export NANI_ELECTRON_HEADERS_PATH="${electronHeaders}"
               export NANI_AUTOPATCHELF=1
               export NANI_AUTOPATCHELF_LIBRARY_PATH="${electronLibraryPath}"
               export NANI_AUTOPATCHELF_APPEND_RPATHS="${dlopenLibraryPath}"
@@ -143,6 +144,10 @@
             url = upstreamPins.dmg.url;
             hash = upstreamPins.dmg.sri;
           };
+          electronHeaders = pkgs.fetchurl {
+            url = "https://electronjs.org/headers/v43.5.0/node-v43.5.0-headers.tar.gz";
+            hash = "sha256-S9KLjeM/ilqHyeE8bVlnlWQlF4T/iTYz0JhLADjCbIQ=";
+          };
           localBuild = pkgs.writeShellApplication {
             name = "nani-local-build";
             runtimeInputs = electronLibraries ++ (with pkgs; [
@@ -152,11 +157,14 @@
               curl
               findutils
               gawk
+              gcc
+              gnumake
               gnugrep
               gnutar
               nodejs_22
               p7zip
               patchelf
+              python3
               unzip
             ]);
             text = ''
@@ -166,6 +174,7 @@
               export NANI_DMG_PATH="${naniDmg}"
               export NANI_DMG_SHA512="${upstreamPins.dmg.sha512}"
               export NANI_VERSION="${upstreamPins.version}"
+              export NANI_ELECTRON_HEADERS_PATH="${electronHeaders}"
               exec bash "$PWD/scripts/build-app.sh" "$@"
             '';
           };
@@ -206,6 +215,7 @@
               nodejs_22
               p7zip
               patchelf
+              python3
               shellcheck
               unzip
             ]);

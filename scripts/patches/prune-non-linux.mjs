@@ -10,6 +10,8 @@ export const NON_LINUX_PAYLOADS = [
   "node_modules/@nut-tree-fork/libnut-darwin",
   "node_modules/@nut-tree-fork/libnut-win32",
   "node_modules/@nut-tree-fork/node-mac-permissions",
+  "node_modules/better-sqlite3/prebuilds/darwin-arm64.node",
+  "node_modules/better-sqlite3/prebuilds/win32-x64.node",
   "bin/language-helper",
 ];
 

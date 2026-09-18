@@ -55,20 +55,6 @@ function sqliteVersion(asarPath) {
   fail("better-sqlite3 package has no version");
 }
 
-function sqliteAsset(releasePath, version, abi) {
-  const release = JSON.parse(fs.readFileSync(releasePath, "utf8"));
-  const expectedName = `better-sqlite3-v${version}-electron-v${abi}-linux-x64.tar.gz`;
-  const matches = (release.assets ?? []).filter((asset) => asset.name === expectedName);
-  if (matches.length !== 1) fail(`expected one ${expectedName} release asset, found ${matches.length}`);
-  const asset = matches[0];
-  const digest = typeof asset.digest === "string" ? asset.digest : "";
-  if (!digest.startsWith("sha256:")) fail(`GitHub did not provide a SHA-256 digest for ${expectedName}`);
-  if (typeof asset.browser_download_url !== "string" || !asset.browser_download_url.startsWith("https://")) {
-    fail(`release asset has no HTTPS download URL: ${expectedName}`);
-  }
-  process.stdout.write([asset.browser_download_url, digest.slice(7), expectedName].join("\t") + "\n");
-}
-
 function writeUpstreamReport(output, version, url, sha512Value, dmgPath) {
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(
@@ -113,10 +99,6 @@ switch (command) {
   case "sqlite-version":
     if (args.length !== 1) fail("usage: build-metadata.mjs sqlite-version ASAR");
     process.stdout.write(sqliteVersion(args[0]) + "\n");
-    break;
-  case "sqlite-asset":
-    if (args.length !== 3) fail("usage: build-metadata.mjs sqlite-asset RELEASE_JSON VERSION ABI");
-    sqliteAsset(...args);
     break;
   case "write-upstream-report":
     if (args.length !== 5) fail("usage: build-metadata.mjs write-upstream-report OUTPUT VERSION URL SHA512 DMG");

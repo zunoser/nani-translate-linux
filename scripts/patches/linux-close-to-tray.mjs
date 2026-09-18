@@ -2,9 +2,9 @@ import { definePatch, PHASE_MAIN_BUNDLE } from "./descriptor.mjs";
 import { markerStatus, replaceExactly } from "./lib.mjs";
 
 export const CLOSE_TO_TRAY_MARKER = "/* nani-linux:linux-close-to-tray */";
-export const CLOSE_TO_TRAY_ANCHOR = 'process.platform==="darwin"&&Ls(d)';
+export const CLOSE_TO_TRAY_ANCHOR = 'process.platform==="darwin"&&Ys(d)';
 const CLOSE_TO_TRAY_REPLACEMENT =
-  '(process.platform==="darwin"||process.platform==="linux")&&Ls(d)' +
+  '(process.platform==="darwin"||process.platform==="linux")&&Ys(d)' +
   CLOSE_TO_TRAY_MARKER;
 
 export default definePatch({
