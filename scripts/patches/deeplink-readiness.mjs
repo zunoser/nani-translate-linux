@@ -1,12 +1,10 @@
 import { definePatch, PHASE_MAIN_BUNDLE } from "./descriptor.mjs";
-import { markerStatus, replaceExactly } from "./lib.mjs";
+import { markerStatus } from "./lib.mjs";
+
+import { pattern, uniqueMatch, replaceMatch } from "./semantic.mjs";
 
 export const DEEPLINK_MARKER = "/* nani-linux:deeplink-readiness */";
-export const DEEPLINK_ANCHOR =
-  'if(t&&e){o.info(`Handling initial deeplink: ${t}`);const n=t;e.webContents.once("did-finish-load",()=>{Ke(n)})}';
-const DEEPLINK_REPLACEMENT =
-  'if(t&&e){o.info(`Handling initial deeplink: ${t}`);const n=t;e.webContents.isLoading()?e.webContents.once("did-finish-load",()=>{Ke(n)}):Ke(n)}' +
-  DEEPLINK_MARKER;
+const TEMPLATE = 'if({{link}}&&{{window}}){{{logger}}.info(`Handling initial deeplink: ${{{link}}}`);const {{local}}={{link}};{{window}}.webContents.once("did-finish-load",()=>{{{handler}}({{local}})})}';
 
 export default definePatch({
   id: "deeplink-readiness",
@@ -16,13 +14,12 @@ export default definePatch({
   apply({ source }) {
     const status = markerStatus(source, DEEPLINK_MARKER);
     if (status) return { source, status };
+    const match = uniqueMatch(source, pattern(TEMPLATE), "initial deep link readiness");
+    const { window, local, handler } = match.groups;
+    const original = `${window}.webContents.once("did-finish-load",()=>{${handler}(${local})})`;
     return {
-      source: replaceExactly(
-        source,
-        DEEPLINK_ANCHOR,
-        DEEPLINK_REPLACEMENT,
-        "initial deep link readiness",
-      ),
+      source: replaceMatch(source, match, match[0].replace(original,
+        `${window}.webContents.isLoading()?${original}:${handler}(${local})`) + DEEPLINK_MARKER),
       status: "applied",
     };
   },

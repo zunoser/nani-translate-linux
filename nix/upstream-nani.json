@@ -1,8 +1,19 @@
 {
-  "version": "1.1.9",
+  "version": "1.1.15",
   "dmg": {
-    "url": "https://nani-desktop.kiok.jp/artifacts/nani-1.1.9.dmg",
-    "sha512": "sK4AFIjfw4JQzRqwDE5CWG6I96PQB+MK69ZhEerdpS4j2/eO1cK3/MtC0T/cnmBJ/7VwQb6KTzqJjDFHxGoKzg==",
-    "sri": "sha256-ZV93d1PGqVceWAWa6cnISgWv7f5eongquOztelD8Zug="
+    "url": "https://nani-desktop.kiok.jp/artifacts/nani-1.1.15.dmg",
+    "sha512": "EpQLQp+gZOVoJ00IaMm0MHP0UcxJuRb7MUcVSerIcg5GEayqSObWEcL9UUddUtSNQwj/d8HRfjI/7FUqOB+Wzw==",
+    "sri": "sha256-s881AbW6JQnF+Jyc6TqviR96JSQmf0lmTNxx69AtRQI="
+  },
+  "electron": {
+    "version": "43.8.3",
+    "zip": {
+      "url": "https://github.com/electron/electron/releases/download/v43.8.3/electron-v43.8.3-linux-x64.zip",
+      "sri": "sha256-c9fW/hIMmY23WDTCPIznzoOQYHwZiy4Weiis15N77yI="
+    },
+    "headers": {
+      "url": "https://electronjs.org/headers/v43.8.3/node-v43.8.3-headers.tar.gz",
+      "sri": "sha256-0jYw0LmBYb7Hhg3MSCGHrKOAseDaJkwe1e+0K8551gQ="
+    }
   }
 }

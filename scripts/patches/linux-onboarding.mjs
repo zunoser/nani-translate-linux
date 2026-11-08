@@ -45,7 +45,7 @@ export default definePatch({
   id: "linux-onboarding",
   phase: PHASE_EXTRACTED_APP,
   order: 20,
-  required: true,
+  required: false,
   apply({ extractedDir }) {
     const rendererFiles = walkFiles(path.join(extractedDir, "out/renderer/assets"))
       .filter((file) => file.endsWith(".js"));

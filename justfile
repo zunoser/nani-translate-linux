@@ -28,7 +28,7 @@ analyze: deps
     node scripts/analyze-upstream.mjs --app "$app" --dmg "$dmg" --output dist/reports/upstream-analysis.json
     printf 'analyzed Nani %s: %s\n' "$version" dist/reports/upstream-analysis.json
 
-# Build nani-app from the latest official DMG.
+# Build nani-app from the verified pinned DMG.
 build-app:
     @./scripts/build-app.sh
 
@@ -37,8 +37,13 @@ run:
     @test -x nani-app/start.sh || { echo 'run just bootstrap first' >&2; exit 1; }
     @./nani-app/start.sh
 
-# Rebuild from the current upstream release.
+# Rebuild the verified pinned release.
 update: deps build-app
+
+# Test the latest release without replacing the working app.
+verify-latest: deps
+    NANI_CHANNEL=latest NANI_OUTPUT_DIR="$PWD/build/latest-candidate" ./scripts/build-app.sh
+    node scripts/smoke-app.mjs build/latest-candidate
 
 # Build an AppImage from nani-app.
 appimage:
@@ -52,7 +57,7 @@ install-desktop:
 
 # Check Bash syntax.
 check-shell:
-    @bash -n install.sh scripts/*.sh scripts/lib/*.sh runtime/start.sh.template
+    @bash -n install.sh scripts/*.sh scripts/lib/*.sh scripts/watchdog/*.sh runtime/start.sh.template
 
 # Run syntax and project tests.
 test: check-shell

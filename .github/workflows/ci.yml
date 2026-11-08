@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,7 +33,7 @@ jobs:
         run: npm ci
 
       - name: Install Nix
-        uses: cachix/install-nix-action@b4b293eae0b79aac8a161bb32925a5508c9cca93 # v31
+        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
 
       - name: Check Just recipes and run tests
         run: nix develop -c bash -c 'just --fmt --check && just test'
@@ -41,7 +42,7 @@ jobs:
         run: npm run check
 
       - name: Check shell scripts
-        run: shellcheck -x scripts/*.sh scripts/lib/*.sh runtime/start.sh.template
+        run: shellcheck -x scripts/*.sh scripts/lib/*.sh scripts/watchdog/*.sh runtime/start.sh.template
 
       - name: Check Nix flake
         run: nix flake check

@@ -20,24 +20,23 @@ if [ -n "${NANI_DMG_PATH:-}" ]; then
   exit 0
 fi
 
-mkdir -p "$NANI_CACHE_DIR/manifests" "$NANI_CACHE_DIR/dmg"
-manifest_path="$NANI_CACHE_DIR/manifests/latest-mac.yml"
-manifest_part="${manifest_path}.part"
-
-require_command curl
-rm -f -- "$manifest_part"
-if ! curl --fail --location --retry 3 --retry-delay 1 --output "$manifest_part" "$NANI_MANIFEST_URL"; then
-  rm -f -- "$manifest_part"
-  die "failed to download upstream manifest"
-fi
-mv -f -- "$manifest_part" "$manifest_path"
-
+mkdir -p "$NANI_CACHE_DIR/dmg"
+release_args=()
+case "${NANI_CHANNEL:-pinned}" in
+  pinned) ;;
+  latest) release_args+=(--latest) ;;
+  *) die "NANI_CHANNEL must be pinned or latest" ;;
+esac
+release_json="$(node "$SCRIPT_DIR/resolve-release.mjs" "${release_args[@]}")"
 IFS=$'\t' read -r version dmg_url expected_sha512 filename < <(
-  node "$SCRIPT_DIR/lib/resolve-upstream.mjs" "$manifest_path" "$NANI_MANIFEST_URL"
+  node --input-type=module -e '
+    import path from "node:path";
+    const r = JSON.parse(process.argv[1]);
+    console.log([r.version, r.dmg.url, r.dmg.sha512, path.basename(new URL(r.dmg.url).pathname)].join("\t"));
+  ' "$release_json"
 )
-if [ -z "$version" ] || [ -z "$dmg_url" ] || [ -z "$expected_sha512" ] || [ -z "$filename" ]; then
-  die "upstream manifest resolver returned incomplete data"
-fi
+[ -n "$version" ] && [ -n "$expected_sha512" ] || die "release resolver returned incomplete data"
+require_command curl
 
 cache_key="$(printf '%s' "${expected_sha512:0:16}" | tr '/+' '_-')"
 dmg_path="$NANI_CACHE_DIR/dmg/${version}-${cache_key}-$filename"

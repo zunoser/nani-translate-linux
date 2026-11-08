@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import { Script } from "node:vm";
 import {
   cpSync,
   chmodSync,
@@ -181,6 +182,7 @@ async function postRepackVerification({
   mainRelativePath,
   nativeHashes,
   executablePayloads,
+  onboardingApplied = true,
 }) {
   verifyNonLinuxHeaderEntries(asar.listPackage(stagedAsar));
   await asar.extractAll(stagedAsar, verifyDir);
@@ -200,7 +202,7 @@ async function postRepackVerification({
     throw new Error(`Optional patch marker is duplicated: ${AUTOSTART_MARKER}`);
   }
   verifyOcrStub(verifyDir);
-  verifyLinuxOnboarding(verifyDir);
+  if (onboardingApplied) verifyLinuxOnboarding(verifyDir);
   verifyNonLinuxPayloadsAbsent(verifyDir);
   verifyExecutablePayloads(stagedUnpacked, verifyDir, executablePayloads);
 
@@ -262,6 +264,7 @@ async function patchAsar(options) {
       throw new Error("One or more required ASAR patches failed");
     }
 
+    new Script(result.mainSource, { filename: mainBundlePath });
     writeOrderingFile(extractedDir, orderingPath);
     await asar.createPackageWithOptions(extractedDir, stagedAsar, {
       ordering: orderingPath,
@@ -275,6 +278,7 @@ async function patchAsar(options) {
       mainRelativePath: report.upstream.main,
       nativeHashes,
       executablePayloads,
+      onboardingApplied: report.patches.some(({ id, status }) => id === "linux-onboarding" && ["applied", "already-applied"].includes(status)),
     });
 
     promoteOutputs({

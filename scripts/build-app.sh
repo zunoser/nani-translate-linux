@@ -21,9 +21,12 @@ work_dir="$(mktemp -d "$NANI_BUILD_DIR/nani-build.XXXXXX")"
 candidate="${NANI_OUTPUT_DIR}.candidate.$$"
 backup="${NANI_OUTPUT_DIR}.previous.$$"
 
+stage="resolve"
 cleanup() {
   status=$?
-  rm -rf -- "$candidate" "$backup" "$lock_dir"
+  node -e 'require("node:fs").writeFileSync(process.argv[1], JSON.stringify({stage:process.argv[2],exitCode:Number(process.argv[3])}))' "$report_dir/build-report.json" "$stage" "$status" || true
+  rm -rf -- "$candidate" "$lock_dir"
+  [ ! -e "$backup" ] || log "previous build retained for recovery: $backup"
   if [ "${NANI_KEEP_WORKDIR:-0}" = 1 ]; then
     log "keeping work directory: $work_dir"
   else
@@ -31,7 +34,9 @@ cleanup() {
   fi
   exit "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 auto_patch_candidate() {
   [ "${NANI_AUTOPATCHELF:-0}" = 1 ] || return 0
@@ -49,6 +54,7 @@ auto_patch_candidate() {
   auto-patchelf "${arguments[@]}"
 }
 
+rm -f -- "$report_dir/upstream.json" "$report_dir/build-info.env"
 printf '{"status":"not-run"}\n' >"$report_dir/patch-report.json"
 
 log "resolving upstream release"
@@ -59,12 +65,14 @@ fi
 node "$SCRIPT_DIR/lib/build-metadata.mjs" write-upstream-report \
   "$report_dir/upstream.json" "$version" "$source_url" "$source_sha512" "$dmg_path"
 
+stage="extract"
 log "extracting Nani.app"
 app_path="$("$SCRIPT_DIR/extract-dmg.sh" "$dmg_path" "$work_dir/dmg")"
 upstream_resources="$app_path/Contents/Resources"
 upstream_asar="$upstream_resources/app.asar"
 [ -f "$upstream_asar" ] || die "upstream app.asar was not found"
 
+stage="electron-download"
 electron_version="$(node "$SCRIPT_DIR/lib/build-metadata.mjs" electron-version "$app_path")"
 electron_filename="electron-v${electron_version}-linux-x64.zip"
 electron_base="https://github.com/electron/electron/releases/download/v${electron_version}"
@@ -84,6 +92,7 @@ else
   download_file "$electron_base/$electron_filename" "$electron_zip" "$electron_sha256"
 fi
 
+stage="native-build"
 mkdir -p "$candidate"
 unzip -q "$electron_zip" -d "$candidate"
 [ -x "$candidate/electron" ] || die "Electron archive did not contain the electron executable"
@@ -158,6 +167,7 @@ sqlite_prebuild="$native_replacements/node_modules/better-sqlite3/prebuilds/linu
 mkdir -p "$(dirname "$sqlite_prebuild")"
 cp -a -- "$sqlite_source" "$sqlite_prebuild"
 
+stage="patch"
 log "patching upstream ASAR"
 node "$SCRIPT_DIR/patch-asar.mjs" \
   --asar "$candidate/resources/app.asar" \
@@ -166,6 +176,7 @@ node "$SCRIPT_DIR/patch-asar.mjs" \
   --native-replacements "$native_replacements"
 cp -a -- "$report_dir/patch-report.json" "$candidate/patch-report.json"
 
+stage="verify"
 auto_patch_candidate
 node "$SCRIPT_DIR/lib/build-metadata.mjs" check-native "$candidate/resources/app.asar.unpacked"
 
@@ -175,8 +186,10 @@ if [ -f "$NANI_ROOT/runtime/start.sh.template" ]; then
 fi
 
 write_build_info "$candidate/build-info.env" "$version" "$electron_version" "$source_url" "$source_sha512"
+printf 'electron_zip_sha256=%s\n' "$(sha256_hex "$electron_zip")" >>"$candidate/build-info.env"
 cp -a -- "$candidate/build-info.env" "$report_dir/build-info.env"
 
+stage="promote"
 if [ -e "$NANI_OUTPUT_DIR" ]; then
   mv -- "$NANI_OUTPUT_DIR" "$backup"
 fi

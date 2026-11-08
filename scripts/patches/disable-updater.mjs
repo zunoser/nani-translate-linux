@@ -1,9 +1,9 @@
 import { definePatch, PHASE_MAIN_BUNDLE } from "./descriptor.mjs";
-import { markerStatus, replaceExactly } from "./lib.mjs";
+import { markerStatus } from "./lib.mjs";
+
+import { pattern, uniqueMatch, replaceMatch } from "./semantic.mjs";
 
 export const UPDATER_MARKER = "/* nani-linux:disable-updater */";
-export const UPDATER_ENABLE_ANCHOR = 'const fe=process.platform!=="win32"';
-export const UPDATER_HANDLERS_ANCHOR = ",xo=We,_o=Qa,Fo=Kn,Po=Xa,Lo=";
 
 export default definePatch({
   id: "disable-updater",
@@ -13,18 +13,16 @@ export default definePatch({
   apply({ source }) {
     const status = markerStatus(source, UPDATER_MARKER);
     if (status) return { source, status };
-    let patched = replaceExactly(
-      source,
-      UPDATER_ENABLE_ANCHOR,
-      `const fe=process.platform==="darwin"${UPDATER_MARKER}`,
-      "updater platform predicate",
-    );
-    patched = replaceExactly(
-      patched,
-      UPDATER_HANDLERS_ANCHOR,
-      ',xo=process.platform==="linux"?async()=>void 0:We,_o=Qa,Fo=Kn,Po=Xa,Lo=',
-      "updater IPC handlers",
-    );
+    const enabled = uniqueMatch(source, pattern('const {{flag}}=process.platform!=="win32",{{session}}={{factory}}({checkForUpdates:async()=>{const {{result}}=await {{updater}}.autoUpdater.checkForUpdates();'), "updater platform predicate");
+    let patched = replaceMatch(source, enabled,
+      enabled[0].replace('process.platform!=="win32"', 'process.platform==="darwin"' + UPDATER_MARKER));
+    const handlers = uniqueMatch(patched, pattern('checkForUpdates:{{check}},checkForUpdatesSilent:{{silent}},quitAndInstall:{{quit}},ensureUpdateDownloaded:{{download}},'), "updater IPC handlers");
+    // Keep the upstream return contracts for silent/download/quit. Their
+    // existing platform predicate now excludes Linux too.
+    patched = replaceMatch(patched, handlers, handlers[0].replace(
+      `checkForUpdates:${handlers.groups.check},`,
+      `checkForUpdates:process.platform==="linux"?async()=>void 0:${handlers.groups.check},`,
+    ));
     return { source: patched, status: "applied" };
   },
 });

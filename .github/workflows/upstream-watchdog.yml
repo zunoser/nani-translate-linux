@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "23 3 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if this artifact and patch implementation were already checked
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -13,162 +18,147 @@ concurrency:
 
 jobs:
   verify-upstream:
-    name: Verify upstream compatibility
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       contents: read
+      issues: read
     outputs:
-      build_status: ${{ steps.verify.outputs.build_status }}
-      drift: ${{ steps.verify.outputs.drift }}
-      new_version: ${{ steps.verify.outputs.new_version }}
-      upstream_version: ${{ steps.verify.outputs.upstream_version }}
+      pins: ${{ steps.pins.outputs.changed }}
+    env:
+      RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
-
-      - name: Install Node.js dependencies
-        run: npm ci
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install --yes build-essential p7zip-full python3
-
-      - name: Verify current upstream release
+      - run: npm ci --ignore-scripts
+      - name: Read the last verification
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const { findStateIssue, decodeState } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/watchdog/state.mjs`);
+            const issue = await findStateIssue(github, context.repo);
+            require('node:fs').writeFileSync('watchdog-previous.json', JSON.stringify(decodeState(issue?.body)));
+      - name: Probe metadata and skip already checked inputs
+        id: probe
+        env:
+          FORCE: ${{ inputs.force }}
+        run: node scripts/watchdog/probe.mjs
+      - name: Install build dependencies
+        if: steps.probe.outputs.build == 'true'
+        run: sudo apt-get update && sudo apt-get install --yes build-essential p7zip-full python3 xvfb xauth
+      - name: Verify the exact detected artifact
         id: verify
-        continue-on-error: true
+        if: steps.probe.outputs.build == 'true'
+        env:
+          NANI_RELEASE_FILE: ${{ github.workspace }}/watchdog-release.json
         shell: bash
         run: |
-          set +e
-          bash scripts/build-app.sh >watchdog-build.log 2>&1
-          build_status=$?
-          set -e
-
-          echo "build_status=$build_status" >>"$GITHUB_OUTPUT"
-          baseline_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).version' nix/upstream-nani.json)"
-          upstream_version=""
-          upstream_report=dist/reports/upstream.json
-          if [ -f "$upstream_report" ]; then
-            upstream_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).version' "$upstream_report")"
-          fi
-          echo "upstream_version=$upstream_version" >>"$GITHUB_OUTPUT"
-          if [ -n "$baseline_version" ] && [ -n "$upstream_version" ] && \
-            [ "$baseline_version" != "$upstream_version" ]; then
-            echo "new_version=true" >>"$GITHUB_OUTPUT"
-          else
-            echo "new_version=false" >>"$GITHUB_OUTPUT"
-          fi
-
-          drift=false
-          report=dist/reports/patch-report.json
-          if [ "$build_status" -ne 0 ] && [ -f "$report" ] && node - "$report" <<'NODE'
-          const fs = require("node:fs");
-          const report = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-          const drift = Array.isArray(report.patches) && report.patches.some(
-            ({ status }) => status === "failed-required" || status === "failed-integrity",
-          );
-          process.exit(drift ? 0 : 1);
+          status=0
+          bash scripts/build-app.sh >watchdog-build.log 2>&1 || status=$?
+          BUILD_STATUS="$status" node scripts/watchdog/result.mjs
+          if [ "$status" -ne 0 ]; then tail -n 80 watchdog-build.log; fi
+      - name: Smoke test the isolated application
+        id: smoke
+        if: steps.verify.outputs.compatible == 'true'
+        run: |
+          status=0
+          # Provision Chromium's supported setuid sandbox on the disposable
+          # runner; keep the application sandbox enabled during the smoke test.
+          sudo chown root:root nani-app/chrome-sandbox
+          sudo chmod 4755 nani-app/chrome-sandbox
+          node scripts/smoke-app.mjs nani-app dist/reports || status=$?
+          BUILD_STATUS="$status" BUILD_STAGE=smoke node scripts/watchdog/result.mjs
+      - name: Prepare verified pin update
+        if: steps.smoke.outputs.compatible == 'true'
+        run: |
+          status=0
+          node scripts/prepare-pins.mjs dist/reports verified-pins.json >watchdog-pins.log 2>&1 || status=$?
+          PIN_STATUS="$status" node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const state = JSON.parse(fs.readFileSync('watchdog-result.json', 'utf8'));
+          if (process.env.PIN_STATUS === '0') {
+            state.verifiedPins = JSON.parse(fs.readFileSync('verified-pins.json', 'utf8'));
+          } else {
+            state.status = 'infrastructure';
+            state.failures = [{ id: 'pin-download', detail: 'Build passed, but pin preparation failed. See watchdog-pins.log.' }];
+          }
+          fs.writeFileSync('watchdog-result.json', JSON.stringify(state));
           NODE
-          then
-            drift=true
+      - name: Check for an outstanding pin proposal
+        id: pins
+        run: |
+          if [ -f verified-pins.json ] && ! cmp -s verified-pins.json nix/upstream-nani.json; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
           fi
-          echo "drift=$drift" >>"$GITHUB_OUTPUT"
-
-          if [ "$build_status" -ne 0 ]; then
-            cat watchdog-build.log >&2
-          fi
-
-          exit "$build_status"
-
-      - name: Fail when upstream verification failed
-        if: steps.verify.outputs.build_status != '0'
-        run: exit 1
+      - name: Keep diagnostic reports even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: watchdog-diagnostics
+          retention-days: 14
+          path: |
+            watchdog-*.json
+            verified-pins.json
+            watchdog-*.log
+            dist/reports/*.json
+            dist/reports/smoke.log
+            dist/reports/build-info.env
 
   report:
-    name: Report upstream changes
     needs: verify-upstream
-    if: >-
-      always() &&
-      (needs.verify-upstream.outputs.new_version == 'true' ||
-      needs.verify-upstream.outputs.drift == 'true')
+    if: needs.verify-upstream.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      issues: write # Required only for creating or updating watchdog issues.
+      contents: read
+      issues: write
     steps:
-      - name: Report a new upstream version
-        if: needs.verify-upstream.outputs.new_version == 'true'
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: watchdog-diagnostics
+          path: watchdog-diagnostics
+      - name: Update one issue without repeated comments
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const { reportState } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/watchdog/state.mjs`);
+            const state = JSON.parse(require('node:fs').readFileSync('watchdog-diagnostics/watchdog-result.json', 'utf8'));
+            await reportState(github, context.repo, state);
+
+  propose-update:
+    needs: verify-upstream
+    if: needs.verify-upstream.outputs.pins == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: watchdog-diagnostics
+          path: watchdog-diagnostics
+      - name: Propose verified pins and dispatch CI
         env:
-          BUILD_STATUS: ${{ needs.verify-upstream.outputs.build_status }}
-          UPSTREAM_VERSION: ${{ needs.verify-upstream.outputs.upstream_version }}
-        with:
-          script: |
-            const title = `[watchdog] Nani ${process.env.UPSTREAM_VERSION} is available`;
-            const issues = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: "all",
-              per_page: 100,
-            });
-            const alreadyReported = issues.some(
-              (issue) => !issue.pull_request && issue.title === title,
-            );
-            if (!alreadyReported) {
-              const result = process.env.BUILD_STATUS === "0" ? "passed" : "failed";
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
-                body: [
-                  `Nani ${process.env.UPSTREAM_VERSION} differs from the documented baseline.`,
-                  `The Linux compatibility build **${result}**.`,
-                  "",
-                  `Workflow run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-                ].join("\n"),
-              });
-            }
-
-      - name: Create or update drift issue
-        if: needs.verify-upstream.outputs.drift == 'true'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
-        with:
-          script: |
-            const title = "[watchdog] Upstream patch drift detected";
-            const body = [
-              "The upstream compatibility build detected required patch drift.",
-              "",
-              `Workflow run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-            ].join("\n");
-            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: "open",
-              per_page: 100,
-            });
-            const existing = openIssues.find(
-              (issue) => !issue.pull_request && issue.title === title,
-            );
-
-            if (existing) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: existing.number,
-                body,
-              });
-            } else {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
-                body,
-              });
-            }
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/watchdog/open-pin-pr.sh

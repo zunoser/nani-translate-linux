@@ -48,12 +48,12 @@
             hash = upstreamPins.dmg.sri;
           };
           electronZip = pkgs.fetchurl {
-            url = "https://github.com/electron/electron/releases/download/v43.5.0/electron-v43.5.0-linux-x64.zip";
-            hash = "sha256-PZP7C5UX/NdBB8Yo9hmQv/YNPCVDaUwosmse94uA3vE=";
+            url = upstreamPins.electron.zip.url;
+            hash = upstreamPins.electron.zip.sri;
           };
           electronHeaders = pkgs.fetchurl {
-            url = "https://electronjs.org/headers/v43.5.0/node-v43.5.0-headers.tar.gz";
-            hash = "sha256-S9KLjeM/ilqHyeE8bVlnlWQlF4T/iTYz0JhLADjCbIQ=";
+            url = upstreamPins.electron.headers.url;
+            hash = upstreamPins.electron.headers.sri;
           };
           nani = pkgs.buildNpmPackage {
             pname = "nani-translate-linux";
@@ -132,6 +132,8 @@
         }
       );
 
+      checks = forAllSystems (system: { package = self.packages.${system}.default; });
+
       apps = forAllSystems (
         system:
         let
@@ -145,8 +147,8 @@
             hash = upstreamPins.dmg.sri;
           };
           electronHeaders = pkgs.fetchurl {
-            url = "https://electronjs.org/headers/v43.5.0/node-v43.5.0-headers.tar.gz";
-            hash = "sha256-S9KLjeM/ilqHyeE8bVlnlWQlF4T/iTYz0JhLADjCbIQ=";
+            url = upstreamPins.electron.headers.url;
+            hash = upstreamPins.electron.headers.sri;
           };
           localBuild = pkgs.writeShellApplication {
             name = "nani-local-build";
@@ -217,6 +219,7 @@
               patchelf
               python3
               shellcheck
+              xvfb-run
               unzip
             ]);
             shellHook = ''

@@ -26,7 +26,7 @@ test("selects the DMG entry instead of the updater primary zip", () => {
       "  - url: Nani-1.1.0-arm64-mac.zip",
       "    sha512: zip-hash",
       "  - url: nani-1.1.0.dmg",
-      "    sha512: dmg-hash",
+      "    sha512: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
       "path: Nani-1.1.0-arm64-mac.zip",
       "sha512: zip-hash",
       "",
@@ -38,7 +38,7 @@ test("selects the DMG entry instead of the updater primary zip", () => {
       assert.equal(result.status, 0, result.stderr);
       assert.equal(
         result.stdout,
-        "1.1.0\thttps://cdn.example/artifacts/nani-1.1.0.dmg\tdmg-hash\tnani-1.1.0.dmg\n",
+        "1.1.0\thttps://cdn.example/artifacts/nani-1.1.0.dmg\tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\tnani-1.1.0.dmg\n",
       );
     },
   );
@@ -59,7 +59,7 @@ test("rejects ambiguous DMG entries", () => {
 
 test("rejects a non-HTTPS resolved URL", () => {
   withManifest(
-    "version: '1'\nfiles:\n  - {url: http://cdn.example/nani.dmg, sha512: a}\n",
+    "version: '1.0.0'\nfiles:\n  - {url: http://cdn.example/nani.dmg, sha512: a}\n",
     (manifest) => {
       const result = spawnSync(process.execPath, [resolver, manifest, "https://cdn.example/latest.yml"], {
         encoding: "utf8",
@@ -68,4 +68,24 @@ test("rejects a non-HTTPS resolved URL", () => {
       assert.match(result.stderr, /must use HTTPS/);
     },
   );
+});
+
+test('normal resolution uses the pin without consulting latest metadata', () => {
+  const result = spawnSync(process.execPath, [path.resolve('scripts/resolve-release.mjs')], {
+    encoding: 'utf8', env: { ...process.env, NANI_RELEASE_FILE: '', NANI_MANIFEST_URL: 'https://invalid.invalid/latest.yml' },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const release = JSON.parse(result.stdout);
+  assert.match(release.version, /^\d+\.\d+\.\d+$/);
+  assert.equal(Buffer.from(release.dmg.sha512, 'base64').length, 64);
+});
+
+test('an explicit release snapshot wins over the moving latest channel', () => {
+  withManifest(JSON.stringify({ version: '1.2.3', dmg: { url: 'https://example.com/nani.dmg', sha512: Buffer.alloc(64).toString('base64') } }), (file) => {
+    const result = spawnSync(process.execPath, [path.resolve('scripts/resolve-release.mjs'), '--latest'], {
+      encoding: 'utf8', env: { ...process.env, NANI_RELEASE_FILE: file, NANI_MANIFEST_URL: 'https://invalid.invalid/latest.yml' },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).version, '1.2.3');
+  });
 });

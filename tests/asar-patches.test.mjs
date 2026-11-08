@@ -1,3 +1,4 @@
+import { UPDATER_ENABLE_ANCHOR, UPDATER_HANDLERS_ANCHOR, TRAY_ANCHOR, CLOSE_TO_TRAY_ANCHOR, DEEPLINK_ANCHOR, AUTOSTART_GET_ANCHOR, AUTOSTART_SET_ANCHOR, AUTOSTART_SYNC_ANCHOR } from "./fixtures/upstream-anchors.mjs";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -11,25 +12,21 @@ import {
 } from "../scripts/patch-asar.mjs";
 
 import deeplinkReadiness, {
-  DEEPLINK_ANCHOR,
   DEEPLINK_MARKER,
 } from "../scripts/patches/deeplink-readiness.mjs";
 import { normalizeDescriptors, PHASE_MAIN_BUNDLE } from "../scripts/patches/descriptor.mjs";
 import disableUpdater, {
-  UPDATER_ENABLE_ANCHOR,
-  UPDATER_HANDLERS_ANCHOR,
   UPDATER_MARKER,
 } from "../scripts/patches/disable-updater.mjs";
 import { runPatchDescriptors } from "../scripts/patches/engine.mjs";
 import linuxCloseToTray, {
-  CLOSE_TO_TRAY_ANCHOR,
   CLOSE_TO_TRAY_MARKER,
 } from "../scripts/patches/linux-close-to-tray.mjs";
 import linuxOnboarding, {
   ONBOARDING_ANCHOR,
   verifyLinuxOnboarding,
 } from "../scripts/patches/linux-onboarding.mjs";
-import linuxTray, { TRAY_ANCHOR, TRAY_MARKER } from "../scripts/patches/linux-tray.mjs";
+import linuxTray, { TRAY_MARKER } from "../scripts/patches/linux-tray.mjs";
 import ocrStub, { verifyOcrStub } from "../scripts/patches/ocr-stub.mjs";
 import pruneNonLinux, {
   NON_LINUX_PAYLOADS,
@@ -37,10 +34,7 @@ import pruneNonLinux, {
   verifyNonLinuxPayloadsAbsent,
 } from "../scripts/patches/prune-non-linux.mjs";
 import xdgAutostart, {
-  AUTOSTART_GET_ANCHOR,
   AUTOSTART_MARKER,
-  AUTOSTART_SET_ANCHOR,
-  AUTOSTART_SYNC_ANCHOR,
 } from "../scripts/patches/xdg-autostart.mjs";
 
 function temporaryDirectory(t) {
@@ -75,14 +69,9 @@ test("descriptors have deterministic phase/order and reject duplicate ids", () =
 
 test("Nani 1.1.9 semantic anchors apply once and are idempotent", () => {
   let source = [
-    UPDATER_ENABLE_ANCHOR,
-    TRAY_ANCHOR,
-    CLOSE_TO_TRAY_ANCHOR,
-    DEEPLINK_ANCHOR,
-    AUTOSTART_GET_ANCHOR,
-    AUTOSTART_SET_ANCHOR,
-    AUTOSTART_SYNC_ANCHOR,
-    UPDATER_HANDLERS_ANCHOR,
+    UPDATER_ENABLE_ANCHOR, TRAY_ANCHOR, CLOSE_TO_TRAY_ANCHOR,
+    DEEPLINK_ANCHOR, AUTOSTART_GET_ANCHOR, AUTOSTART_SET_ANCHOR,
+    AUTOSTART_SYNC_ANCHOR, UPDATER_HANDLERS_ANCHOR,
   ].join(";");
 
   for (const descriptor of [
@@ -261,4 +250,16 @@ test("xsel stays unpacked, byte-identical, and executable", (t) => {
     () => verifyExecutablePayloads(unpacked, verified, payloads),
     /payload bytes changed/,
   );
+});
+
+test("onboarding drift does not prevent required Linux patches", (t) => {
+  const root = temporaryDirectory(t);
+  const mainBundlePath = path.join(root, "main.js");
+  writeFileSync(mainBundlePath, TRAY_ANCHOR);
+  const result = runPatchDescriptors({ extractedDir: root, mainBundlePath, descriptors: [linuxOnboarding, linuxTray] });
+  assert.equal(result.hasRequiredFailure, false);
+  assert.equal(result.hasIntegrityFailure, false);
+  assert.equal(result.entries.find(p => p.id === 'linux-onboarding').status, 'skipped-optional');
+  assert.equal(result.entries.find(p => p.id === 'linux-tray').status, 'applied');
+  assert.match(readFileSync(mainBundlePath, 'utf8'), /nativeImage.createFromPath/);
 });
