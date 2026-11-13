@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Nani Community
+Comment=Local PLaMo translation with optional ChatGPT
+Exec=nani-community %U
+Icon=nani-community
+Terminal=false
+Type=Application
+Categories=Utility;Office;
+MimeType=x-scheme-handler/nani-community;
+StartupWMClass=Nani Community

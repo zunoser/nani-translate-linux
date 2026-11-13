@@ -57,7 +57,7 @@ install-desktop:
 
 # Check Bash syntax.
 check-shell:
-    @bash -n install.sh scripts/*.sh scripts/lib/*.sh scripts/watchdog/*.sh runtime/start.sh.template
+    @bash -n install.sh scripts/*.sh scripts/lib/*.sh scripts/watchdog/*.sh runtime/start.sh.template runtime/community-start.sh.template
 
 # Run syntax and project tests.
 test: check-shell
@@ -66,3 +66,19 @@ test: check-shell
 # Remove generated build outputs.
 clean:
     @rm -rf -- build nani-app
+
+# Convert the regular Linux artifact into a separate Community build.
+build-community source="nani-app" output="nani-community-app":
+    node scripts/build-community.mjs {{ quote(source) }} {{ quote(output) }}
+
+# Run PLaMo locally; downloads the pinned model on first use.
+plamo:
+    node scripts/start-plamo.mjs
+
+# Run the separate Community build.
+run-community:
+    @./nani-community-app/start.sh
+
+# Package Community with its own name, launcher, and desktop identity.
+appimage-community:
+    @bash scripts/build-community-appimage.sh

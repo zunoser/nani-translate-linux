@@ -60,7 +60,7 @@
             version = upstreamPins.version;
             src = self;
 
-            npmDepsHash = "sha256-kBGwHGdgxbZxUCGIqL22zXvcVsmzy3SXWGoZMliYvSA=";
+            npmDepsHash = "sha256-8SpvDjI/+eynVmQ2hEqL6qRyJe4L5n6lis1Qz8V+ZjM=";
             npmInstallFlags = [ "--ignore-scripts" ];
             dontNpmBuild = true;
             dontBuild = true;
@@ -86,7 +86,7 @@
             doCheck = true;
             checkPhase = ''
               runHook preCheck
-              substituteInPlace tests/runtime-packaging.test.mjs \
+              substituteInPlace tests/runtime-packaging.test.mjs tests/community-packaging.test.mjs \
                 --replace-fail "#!/usr/bin/env bash" "#!${pkgs.bash}/bin/bash"
               npm test
               runHook postCheck

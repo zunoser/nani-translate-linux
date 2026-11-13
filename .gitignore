@@ -8,3 +8,5 @@ result
 *.part
 patch-report.json
 upstream-analysis.json
+
+nani-community-app/
